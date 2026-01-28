@@ -1,0 +1,15 @@
+[Unit]
+Description=Space Vision Player
+After=network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m app.main
+KillMode=control-group
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target

@@ -14,8 +14,17 @@
   },
 
   // ========================================
+  // active_time（省略可）
+  // 省略時は常時再生
+  // ========================================
+  // "active_time": {
+  //   "mon": {"from": "08:00", "until": "22:00"},
+  //   "tue": {"from": "08:00", "until": "22:00"}
+  // },
+
+  // ========================================
   // screen（省略可）
-  // 省略時は config/vision_config.json が使われる
+  // 省略時は vision_players/<vision_id>/config/vision_config.json が使われる
   // ========================================
   // "screen": {
   //   "width": 1280,
@@ -119,8 +128,8 @@
   // auto_policy
   // ========================================
   // "auto_policy": {
-  //   // encoded/<weekday> 固定
-  //   "directory": "encoded/always",
+  //   // output/media/<weekday> 固定
+  //   "directory": "output/media/always",
   //
   //   // ソート順（asc / desc）
   //   "sort": "asc",

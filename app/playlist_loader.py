@@ -1,10 +1,10 @@
-# vision_player/playlist_loader.py
+# app/playlist_loader.py
 import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from config.lane_config import LaneItem
+from app.models import LaneItem
 
 
 def _is_item_available(item: Dict[str, Any], now: datetime) -> bool:
@@ -47,19 +47,19 @@ def _filter_items(items: List[Dict[str, Any]], now: datetime) -> List[Dict[str, 
     return [item for item in items if _is_item_available(item, now)]
 
 
-def _resolve_media_path(path: str, encoded_base_dir: Path) -> Path:
+def _resolve_media_path(path: str, media_base_dir: Path) -> Path:
     media_path = Path(path)
     if not media_path.is_absolute():
-        if media_path.parts and media_path.parts[0] == encoded_base_dir.name:
-            media_path = encoded_base_dir.parent / media_path
+        if media_path.parts and media_path.parts[0] == media_base_dir.name:
+            media_path = media_base_dir.parent / media_path
         else:
-            media_path = encoded_base_dir / media_path
+            media_path = media_base_dir / media_path
     return media_path
 
 
 def _build_auto_items(
     auto_policy: Dict[str, Any],
-    encoded_base_dir: Path,
+    media_base_dir: Path,
 ) -> List[LaneItem]:
     directory = auto_policy.get("directory")
     if not directory:
@@ -67,10 +67,10 @@ def _build_auto_items(
 
     base_dir = Path(directory)
     if not base_dir.is_absolute():
-        if base_dir.parts and base_dir.parts[0] == encoded_base_dir.name:
-            base_dir = encoded_base_dir.parent / base_dir
+        if base_dir.parts and base_dir.parts[0] == media_base_dir.name:
+            base_dir = media_base_dir.parent / base_dir
         else:
-            base_dir = encoded_base_dir / base_dir
+            base_dir = media_base_dir / base_dir
 
     if not base_dir.exists():
         print(f"[playlist_loader] auto_policy directory not found: {base_dir}")
@@ -108,7 +108,7 @@ def _merge_items(
 
 def _normalize_items(
     items: List[Dict[str, Any]],
-    encoded_base_dir: Path,
+    media_base_dir: Path,
 ) -> List[LaneItem]:
     normalized: List[LaneItem] = []
     for item in items:
@@ -120,15 +120,15 @@ def _normalize_items(
             path = item.get("path")
             if not path:
                 continue
-            normalized.append(LaneItem(path=_resolve_media_path(path, encoded_base_dir)))
+            normalized.append(LaneItem(path=_resolve_media_path(path, media_base_dir)))
         elif isinstance(item, str):
-            normalized.append(LaneItem(path=_resolve_media_path(item, encoded_base_dir)))
+            normalized.append(LaneItem(path=_resolve_media_path(item, media_base_dir)))
     return normalized
 
 
 def load_playlist(
     playlist_path: Path,
-    encoded_base_dir: Path,
+    media_base_dir: Path,
     now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
@@ -139,7 +139,7 @@ def load_playlist(
     ----------
     playlist_path : Path
         使用する playlist JSON のパス
-    encoded_base_dir : Path
+    media_base_dir : Path
         メディアファイルの基準ディレクトリ
     now : datetime, optional
         現在時刻（tz-aware）。None の場合はフィルタしない。
@@ -154,7 +154,7 @@ def load_playlist(
 
     lanes = playlist.get("lanes", {})
     auto_policy = playlist.get("auto_policy", {})
-    auto_items = _build_auto_items(auto_policy, encoded_base_dir)
+    auto_items = _build_auto_items(auto_policy, media_base_dir)
     auto_mode = auto_policy.get("mode", "replace_if_empty")
     filtered_lanes: Dict[str, Any] = {}
 
@@ -168,7 +168,7 @@ def load_playlist(
 
         # lane 設定は保ったまま、items だけ差し替える
         filtered_lane_conf = dict(lane_conf)
-        lane_items = _normalize_items(items, encoded_base_dir)
+        lane_items = _normalize_items(items, media_base_dir)
         filtered_lane_conf["items"] = _merge_items(
             lane_items,
             auto_items,

@@ -3,15 +3,22 @@ import time
 from pathlib import Path
 from typing import List
 
-from config.lane_config import LaneConfig
-from vision_player.rect import Rect
+from app.models import LaneConfig
+from app.rect import Rect
 
 
 class LanePlayer:
-    def __init__(self, lane_config: LaneConfig):
+    def __init__(
+        self,
+        lane_config: LaneConfig,
+        active_checker=None,
+        inactive_sleep_sec: int = 30,
+    ):
         self.cfg = lane_config
         self._updating_flag = Path("./state/media_updating.flag")
         self._updating_media = Path("./system_media/updating.mp4")
+        self._active_checker = active_checker
+        self._inactive_sleep_sec = inactive_sleep_sec
 
     def run(self):
         print(f"[Lane {self.cfg.lane_id}] start")
@@ -28,28 +35,44 @@ class LanePlayer:
             if self._is_updating():
                 self._play_updating()
                 continue
+            if self._active_checker and not self._active_checker():
+                time.sleep(self._inactive_sleep_sec)
+                continue
 
             if not self.cfg.items:
                 time.sleep(1)
                 continue
 
-            for item in self.cfg.items:
+            if self.cfg.loop and len(self.cfg.items) == 1:
                 if self._is_updating():
-                    break
-                self.play_item(item)
-                if self._is_updating():
-                    break
+                    continue
+                self.play_item(
+                    self.cfg.items[0],
+                    loop=True,
+                    active_checker=self._active_checker,
+                )
+            else:
+                for item in self.cfg.items:
+                    if self._is_updating():
+                        break
+                    self.play_item(
+                        item,
+                        loop=False,
+                        active_checker=self._active_checker,
+                    )
+                    if self._is_updating():
+                        break
 
             if not self.cfg.loop:
                 print(f"[Lane {self.cfg.lane_id}] loop disabled, exit")
                 break
 
-    def play_item(self, item):
+    def play_item(self, item, loop: bool = False, active_checker=None):
         cmd = build_mpv_command(
             media_path=item.path,
             rect=self.cfg.rect,
             volume=self.cfg.volume,
-            loop=False,  # item 単位では loop しない
+            loop=loop,
         )
 
         print(f"[Lane {self.cfg.lane_id}] play {item.path.name}")
@@ -58,6 +81,13 @@ class LanePlayer:
             proc = subprocess.Popen(cmd)
             while True:
                 if proc.poll() is not None:
+                    break
+                if active_checker and not active_checker():
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
                     break
                 if self._is_updating():
                     proc.terminate()
@@ -110,6 +140,8 @@ class LanePlayer:
                     proc.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+
+
 def build_mpv_command(
     media_path: Path,
     rect: Rect,

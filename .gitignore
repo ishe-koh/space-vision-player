@@ -10,5 +10,18 @@ venv/
 .DS_Store
 
 # runtime / generated
-encoded/
 state/
+vision_players/*
+!vision_players/
+!vision_players/_local/
+!vision_players/_local/config/
+!vision_players/_local/config/**/vision_config.json
+!vision_players/_local/source/
+!vision_players/_local/source/media/
+!vision_players/_local/source/media/**/.gitkeep
+!vision_players/_local/output/
+!vision_players/_local/output/playlists/
+!vision_players/_local/output/playlists/README.md
+!vision_players/_local/output/playlists/sample.jsonc
+!vision_players/_local/output/playlists/always.json
+!vision_players/**/.gitkeep

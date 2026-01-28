@@ -1,5 +1,5 @@
-# vision_player/playlist_selector.py
-from datetime import datetime, timezone
+# app/playlist_selector.py
+from datetime import datetime
 from pathlib import Path
 import subprocess
 from typing import Tuple
@@ -50,7 +50,7 @@ def get_now() -> datetime:
         )
         return datetime.fromisoformat(result.stdout.strip())
     except Exception:
-        return datetime.now(timezone.utc)
+        return datetime.now().astimezone()
 
 
 _WEEKDAY_MAP = {

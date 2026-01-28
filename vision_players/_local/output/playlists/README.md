@@ -6,12 +6,13 @@ This document defines the playlist JSON format used by vision-player.
 - One file per weekday: `mon.json`, `tue.json`, ... `sun.json`
 - If the weekday file does not exist, `always.json` is used
 
-Selection logic lives in `vision_player/playlist_selector.py`.
+Selection logic lives in `app/playlist_selector.py`.
 
 ## Top-level structure
 ```json
 {
   "meta": { ... },
+  "active_time": { ... },
   "screen": { ... },
   "auto_policy": { ... },
   "lanes": { ... }
@@ -29,7 +30,7 @@ Defaults used when lane settings are missing.
 ```
 
 ## screen
-Optional. If omitted, `config/vision_config.json` is used.
+Optional. If omitted, `vision_players/<vision_id>/config/vision_config.json` is used.
 ```json
 {
   "width": 1280,
@@ -38,6 +39,21 @@ Optional. If omitted, `config/vision_config.json` is used.
   "rows": 1
 }
 ```
+
+## active_time
+Optional. If omitted, playback is always on.
+
+```json
+{
+  "mon": {"from": "08:00", "until": "22:00"},
+  "tue": {"from": "08:00", "until": "22:00"}
+}
+```
+
+Rules:
+- `from` / `until` are **HH:MM** (24h)
+- Playback is active when `from <= now < until`
+- If the weekday key is missing, playback is always on
 
 ## lanes
 - Lane order follows JSON declaration order.
@@ -77,11 +93,11 @@ Rules:
 - If timezone is missing, it is treated as an error
 
 ## auto_policy
-Used to auto-generate items from a directory (encoded media).
+Used to auto-generate items from a directory (media outputs).
 
 ```json
 {
-  "directory": "encoded/always",
+  "directory": "output/media/always",
   "sort": "asc",
   "mode": "replace_if_empty",
   "extensions": [".mp4", ".png", ".jpg"]
@@ -89,7 +105,7 @@ Used to auto-generate items from a directory (encoded media).
 ```
 
 Rules:
-- `directory` is fixed to `encoded/<weekday>` style (relative to project root)
+- `directory` is fixed to `output/media/<weekday>` style (relative to vision root)
 - `mode`:
   - `replace_if_empty`: if lane items are empty, use auto items
   - `append_remaining`: append files not already listed in items
@@ -97,5 +113,7 @@ Rules:
 - `mode` default is `replace_if_empty`
 
 ## Path resolution
-All relative media paths are resolved against `encoded/`.
-If a path already starts with `encoded/`, it is used as-is.
+All relative media paths are resolved against the media base directory.
+When using the media-server push layout, the base is `vision_players/<vision_id>/output/media/`.
+When using standalone mode, the base is `vision_players/_local/output/media/`.
+If a path already starts with the base directory name, it is used as-is.

@@ -1,10 +1,9 @@
 {
   "auto_policy": {
-    "directory": "encoded/always",
+    "directory": "output/media/always",
     "sort": "asc",
     "loop": true,
     "mode": "replace_if_empty",
-    "default_image_duration": 10,
     "extensions": [".mp4", ".png", ".jpg"]
   },
   "lanes": {

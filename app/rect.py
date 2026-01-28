@@ -1,4 +1,4 @@
-# vision_player/rect.py
+# app/rect.py
 from dataclasses import dataclass
 from typing import List
 

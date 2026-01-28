@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from vision_player.rect import Rect
+from app.rect import Rect
 
 
 @dataclass
