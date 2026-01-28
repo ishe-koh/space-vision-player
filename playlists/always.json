@@ -1,0 +1,16 @@
+{
+  "auto_policy": {
+    "directory": "encoded/always",
+    "sort": "asc",
+    "loop": true,
+    "mode": "replace_if_empty",
+    "default_image_duration": 10,
+    "extensions": [".mp4", ".png", ".jpg"]
+  },
+  "lanes": {
+    "lane0": {
+      "volume": 100,
+      "start_offset_sec": 0
+    }
+  }
+}

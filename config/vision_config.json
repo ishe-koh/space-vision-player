@@ -1,0 +1,15 @@
+{
+  "cabinet": {
+    "width": 128,
+    "height": 256,
+    "cols": 10,
+    "rows": 1
+  },
+
+  "lane_layout": {
+    "cols": 3,
+    "rows": 1,
+    "align_x": "center",
+    "align_y": "top"
+  }
+}
