@@ -109,8 +109,10 @@ Rules:
 - `mode`:
   - `replace_if_empty`: if lane items are empty, use auto items
   - `append_remaining`: append files not already listed in items
+  - `append_remaining_always`: append files not already listed, plus output/media/always
   - `disabled`: do not use auto items
 - `mode` default is `replace_if_empty`
+- `always_directory` (optional): override always media directory for append_remaining_always
 
 ## Path resolution
 All relative media paths are resolved against the media base directory.

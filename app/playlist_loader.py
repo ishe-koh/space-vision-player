@@ -94,6 +94,7 @@ def _merge_items(
     lane_items: List[LaneItem],
     auto_items: List[LaneItem],
     mode: str,
+    always_items: Optional[List[LaneItem]] = None,
 ) -> List[LaneItem]:
     if mode == "disabled":
         return lane_items
@@ -103,6 +104,17 @@ def _merge_items(
         lane_paths = {item.path for item in lane_items}
         remaining = [item for item in auto_items if item.path not in lane_paths]
         return lane_items + remaining
+    if mode == "append_remaining_always":
+        lane_paths = {item.path for item in lane_items}
+        remaining = [item for item in auto_items if item.path not in lane_paths]
+        merged = lane_items + remaining
+        if always_items:
+            merged_paths = {item.path for item in merged}
+            remaining_always = [
+                item for item in always_items if item.path not in merged_paths
+            ]
+            merged += remaining_always
+        return merged
     raise ValueError(f"Unknown auto_policy.mode: {mode}")
 
 
@@ -156,6 +168,17 @@ def load_playlist(
     auto_policy = playlist.get("auto_policy", {})
     auto_items = _build_auto_items(auto_policy, media_base_dir)
     auto_mode = auto_policy.get("mode", "replace_if_empty")
+    always_items: Optional[List[LaneItem]] = None
+    if auto_mode == "append_remaining_always":
+        always_dir = auto_policy.get("always_directory") or str(media_base_dir / "always")
+        always_items = _build_auto_items(
+            {
+                "directory": always_dir,
+                "extensions": auto_policy.get("extensions", [".mp4"]),
+                "sort": auto_policy.get("sort", "asc"),
+            },
+            media_base_dir,
+        )
     filtered_lanes: Dict[str, Any] = {}
 
     for lane_id, lane_conf in lanes.items():
@@ -173,6 +196,7 @@ def load_playlist(
             lane_items,
             auto_items,
             auto_mode,
+            always_items=always_items,
         )
 
         filtered_lanes[lane_id] = filtered_lane_conf

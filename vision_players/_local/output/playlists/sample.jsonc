@@ -137,7 +137,10 @@
   //   // auto_policy の合成モード
   //   // - replace_if_empty: items が空の lane だけ自動生成
   //   // - append_remaining: items の末尾に未掲載ファイルを追加
+  //   // - append_remaining_always: append_remaining に加えて output/media/always も追加
   //   // - disabled: auto_policy を使わない
+  //   // always_directory: append_remaining_always の always 参照先（省略時は output/media/always）
+  //   // "always_directory": "output/media/always",
   //   "mode": "append_remaining"
   // }
 }
