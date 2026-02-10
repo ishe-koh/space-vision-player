@@ -97,7 +97,7 @@ Used to auto-generate items from a directory (media outputs).
 
 ```json
 {
-  "directory": "output/media/always",
+  "directory": "always/lane0",
   "sort": "asc",
   "mode": "replace_if_empty",
   "extensions": [".mp4", ".png", ".jpg"]
@@ -105,14 +105,16 @@ Used to auto-generate items from a directory (media outputs).
 ```
 
 Rules:
-- `directory` is fixed to `output/media/<weekday>` style (relative to vision root)
+- `directory` is resolved relative to `output/media/` (vision root)
+  - To target lane0: `"<weekday>/lane0"`
 - `mode`:
   - `replace_if_empty`: if lane items are empty, use auto items
   - `append_remaining`: append files not already listed in items
-  - `append_remaining_always`: append files not already listed, plus output/media/always
+- `append_remaining_always`: append files not already listed, plus `always_directory`
   - `disabled`: do not use auto items
 - `mode` default is `replace_if_empty`
 - `always_directory` (optional): override always media directory for append_remaining_always
+  - To target lane0: `"always/lane0"`
 
 ## Path resolution
 All relative media paths are resolved against the media base directory.
