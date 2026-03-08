@@ -1,4 +1,4 @@
-# space-vision-player
+ぃ# space-vision-player
 
 Raspberry Pi 向けの LED ビジョン再生プレイヤー。
 media-server（別リポジトリ）が出力した
@@ -203,34 +203,71 @@ sudo mkdir -p /home/pi/space-vision-player
 sudo chown -R pi:pi /home/pi/space-vision-player
 ```
 
-2) service 配置
+2) service 配置（player + Xorg 専用）
 ```
 sudo cp systemd/space-vision-player.service /etc/systemd/system/
+sudo cp systemd/xorg-kiosk.service /etc/systemd/system/
 ```
 
-3) `systemd/space-vision-player.service` を編集
-- `User`, `Group`, `WorkingDirectory`, `XAUTHORITY` を環境に合わせる
-- `DISPLAY=:0` を正しいセッションに合わせる
+3) kiosk 構成へ切替（VT switch 回避のため必須）
+```
+sudo systemctl disable --now lightdm getty@tty1
+sudo systemctl daemon-reload
+sudo systemctl enable --now xorg-kiosk
+```
+`xorg-kiosk.service` は `Xorg :0 -nolisten tcp -noreset -keeptty -novtswitch vt1` で起動し、
+VT switch の影響を減らす目的。
+
+4) `space-vision-player` の override を作成
+```
+sudo systemctl edit space-vision-player
+```
+例:
+```
+[Service]
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/space-vision-player
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=VISION_ID=akiba_01
+```
+環境に合わせて `User` とパスを変更すること。
+
+5) `systemd/space-vision-player.service` の前提
 - `VISION_ID` で再生するディレクトリを指定（例: `akiba_01`）
   - 未指定の場合は `vision_players/_local/` が優先される
   - 複数の `vision_players/` がある場合は必ず指定する
+- 必要に応じて `DISPLAY` / `XAUTHORITY` を環境に合わせる
+- `SVP_MPV_GPU_CONTEXT=x11egl` は既定値（DRM 直接利用を避けるため）
 
-4) 有効化
+6) 有効化
 ```
-sudo systemctl daemon-reload
 sudo systemctl enable --now space-vision-player
+sudo systemctl restart space-vision-player
 ```
 
-5) ログ確認
+7) ログ確認
 ```
 journalctl -u space-vision-player -f
+journalctl -u xorg-kiosk -f
 ```
+
+## Stability tips (Raspberry Pi + Xorg + mpv)
+- まず `SVP_MPV_GPU_CONTEXT=x11egl`（既定）で運用し、`mpv -> Xorg -> DRM` に固定する。
+- `/boot/config.txt` は `dtoverlay=vc4-kms-v3d` を維持し、必要なら `max_framebuffers=1` を検討。
+- 監視ログ:
+```
+grep -E "drmSetMaster failed|VT switch|AIGLX" /var/log/Xorg.0.log
+```
+- `AIGLX: Suspending AIGLX clients for VT switch` が出る環境では、display manager 由来の VT 切替を止める。
 
 ## Updating behavior
 `state/media_updating.flag` が存在する間、
 全 lane で `system_media/updating.mp4` をループ再生する。
 
 ## Notes
+- `xorg-kiosk` は X サーバー担当、`space-vision-player` は mpv 再生担当（役割は別）
 - lane = 1 mpv プロセス
 - 1 item = 1 mpv 起動（ただし item が 1 つで loop の場合は mpv 自体を loop 起動）
 - mpv のウィンドウ位置・サイズは起動時のみ指定

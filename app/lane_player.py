@@ -1,10 +1,18 @@
 import subprocess
 import time
+import os
 from pathlib import Path
 from typing import List
 
 from app.models import LaneConfig
 from app.rect import Rect
+
+
+def _get_env(name: str, default: str) -> str:
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    return default
 
 
 class LanePlayer:
@@ -179,6 +187,9 @@ def build_mpv_command(
         "--input-vo-keyboard=no",
         "--no-terminal",
         "--msg-level=all=no",
+        # Use X11-backed GPU context by default to avoid direct DRM/GBM paths.
+        f"--vo={_get_env('SVP_MPV_VO', 'gpu')}",
+        f"--gpu-context={_get_env('SVP_MPV_GPU_CONTEXT', 'x11egl')}",
     ]
 
     if loop:
