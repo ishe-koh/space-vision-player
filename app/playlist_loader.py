@@ -174,20 +174,7 @@ def load_playlist(
         playlist = json.load(f)
 
     lanes = playlist.get("lanes", {})
-    auto_policy = playlist.get("auto_policy", {})
-    auto_items = _build_auto_items(auto_policy, media_base_dir)
-    auto_mode = auto_policy.get("mode", "replace_if_empty")
-    always_items: Optional[List[LaneItem]] = None
-    if auto_mode == "append_remaining_always":
-        always_dir = auto_policy.get("always_directory") or str(media_base_dir / "always")
-        always_items = _build_auto_items(
-            {
-                "directory": always_dir,
-                "extensions": auto_policy.get("extensions", [".mp4"]),
-                "sort": auto_policy.get("sort", "asc"),
-            },
-            media_base_dir,
-        )
+    default_auto_policy = playlist.get("auto_policy", {})
     filtered_lanes: Dict[str, Any] = {}
 
     for lane_id, lane_conf in lanes.items():
@@ -200,6 +187,20 @@ def load_playlist(
 
         # lane 設定は保ったまま、items だけ差し替える
         filtered_lane_conf = dict(lane_conf)
+        lane_auto_policy = lane_conf.get("auto_policy", default_auto_policy)
+        auto_items = _build_auto_items(lane_auto_policy, media_base_dir)
+        auto_mode = lane_auto_policy.get("mode", "replace_if_empty")
+        always_items: Optional[List[LaneItem]] = None
+        if auto_mode == "append_remaining_always":
+            always_dir = lane_auto_policy.get("always_directory") or str(media_base_dir / "always")
+            always_items = _build_auto_items(
+                {
+                    "directory": always_dir,
+                    "extensions": lane_auto_policy.get("extensions", [".mp4"]),
+                    "sort": lane_auto_policy.get("sort", "asc"),
+                },
+                media_base_dir,
+            )
         lane_items = _normalize_items(items, media_base_dir)
         filtered_lane_conf["items"] = _merge_items(
             lane_items,
