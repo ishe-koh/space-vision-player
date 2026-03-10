@@ -91,6 +91,7 @@ Two forms are allowed:
 Rules:
 - `is_available_from` / `is_available_until` must be ISO8601 **with timezone**
 - If timezone is missing, it is treated as an error
+- availability is re-evaluated during runtime (roughly every 30 seconds)
 
 ## auto_policy
 Used to auto-generate items from a directory (media outputs).
@@ -108,7 +109,7 @@ Rules:
 - `directory` is resolved relative to `output/media/` (vision root)
   - To target lane0: `"<weekday>/lane0"`
 - `mode`:
-  - `replace_if_empty`: if lane items are empty, use auto items
+  - `replace_if_empty`: if lane items are empty after availability filtering, use auto items
   - `append_remaining`: append files not already listed in items
 - `append_remaining_always`: append files not already listed, plus `always_directory`
   - `disabled`: do not use auto items

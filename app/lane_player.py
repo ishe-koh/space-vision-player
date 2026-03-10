@@ -2,7 +2,7 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import List
+from typing import Callable, List, Optional
 
 from app.models import LaneConfig
 from app.rect import Rect
@@ -19,14 +19,50 @@ class LanePlayer:
     def __init__(
         self,
         lane_config: LaneConfig,
+        items_provider: Optional[Callable[[], List]] = None,
         active_checker=None,
+        items_refresh_interval_sec: int = 30,
         inactive_sleep_sec: int = 30,
     ):
         self.cfg = lane_config
         self._updating_flag = Path("./state/media_updating.flag")
         self._updating_media = Path("./system_media/updating.mp4")
+        self._items_provider = items_provider
         self._active_checker = active_checker
+        self._items_refresh_interval_sec = items_refresh_interval_sec
         self._inactive_sleep_sec = inactive_sleep_sec
+        self._last_items_refresh_at = 0.0
+        self._last_items_signature = self._items_signature(self.cfg.items)
+        self._playlist_update_pending = False
+
+    def _items_signature(self, items: List) -> List[str]:
+        return [str(item.path) for item in items]
+
+    def _refresh_items(self, force: bool = False) -> bool:
+        if self._items_provider is None:
+            return False
+
+        current = time.monotonic()
+        if (
+            not force
+            and current - self._last_items_refresh_at < self._items_refresh_interval_sec
+        ):
+            return False
+
+        self._last_items_refresh_at = current
+        items = self._items_provider() or []
+        signature = self._items_signature(items)
+        if signature == self._last_items_signature:
+            return False
+
+        self.cfg.items = items
+        self._last_items_signature = signature
+        self._playlist_update_pending = True
+        print(
+            f"[Lane {self.cfg.lane_id}] playlist updated "
+            f"(items={len(self.cfg.items)})"
+        )
+        return True
 
     def run(self):
         print(f"[Lane {self.cfg.lane_id}] start")
@@ -39,7 +75,11 @@ class LanePlayer:
             )
             time.sleep(self.cfg.start_offset_sec)
 
+        self._refresh_items(force=True)
+
         while True:
+            self._refresh_items()
+
             if self._is_updating():
                 self._play_updating()
                 continue
@@ -56,9 +96,12 @@ class LanePlayer:
                     continue
                 self.play_item(
                     self.cfg.items[0],
-                    loop=True,
+                    loop=False,
                     active_checker=self._active_checker,
                 )
+                if self._playlist_update_pending:
+                    self._playlist_update_pending = False
+                    continue
             else:
                 for item in self.cfg.items:
                     if self._is_updating():
@@ -69,6 +112,9 @@ class LanePlayer:
                         active_checker=self._active_checker,
                     )
                     if self._is_updating():
+                        break
+                    if self._playlist_update_pending:
+                        self._playlist_update_pending = False
                         break
 
             if not self.cfg.loop:
@@ -90,6 +136,7 @@ class LanePlayer:
             while True:
                 if proc.poll() is not None:
                     break
+                self._refresh_items()
                 if active_checker and not active_checker():
                     proc.terminate()
                     try:

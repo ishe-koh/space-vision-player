@@ -8,8 +8,8 @@ from typing import Optional
 
 from app.lane_player import LanePlayer
 from app.models import LaneConfig
-from app.playlist_loader import load_playlist
-from app.playlist_selector import get_now, get_weekday, select_playlist_path_for_now
+from app.playlist_runtime import PlaylistRuntime
+from app.playlist_selector import get_now, get_weekday
 from app.rect import calc_lane_rects
 
 
@@ -68,8 +68,8 @@ def _resolve_vision_root() -> Path:
 
 
 class ActiveTimeGate:
-    def __init__(self, active_time: dict, check_interval_sec: int = 30):
-        self._active_time = active_time or {}
+    def __init__(self, runtime: PlaylistRuntime, check_interval_sec: int = 30):
+        self._runtime = runtime
         self._last_state: Optional[bool] = None
         self._last_log_at = 0.0
         self._check_interval_sec = check_interval_sec
@@ -84,7 +84,8 @@ class ActiveTimeGate:
     def is_active(self) -> bool:
         now = get_now()
         weekday = get_weekday(now)
-        rule = self._active_time.get(weekday)
+        active_time = self._runtime.get_active_time()
+        rule = active_time.get(weekday)
         if not rule:
             self._log_state(True, weekday, now, "no rule")
             return True
@@ -127,19 +128,19 @@ def main():
     playlist_dir.mkdir(parents=True, exist_ok=True)
     media_dir.mkdir(parents=True, exist_ok=True)
 
-    playlist_path, now, weekday = select_playlist_path_for_now(playlist_dir)
+    runtime = PlaylistRuntime(playlist_dir=playlist_dir, media_dir=media_dir)
+    snapshot = runtime.get_snapshot(force=True)
+    playlist_path = snapshot["playlist_path"]
+    now = snapshot["now"]
+    weekday = snapshot["weekday"]
     print(f"[main] now = {now}")
     print(f"[main] weekday = {weekday}")
 
     print(f"[main] playlist_path = {playlist_path.resolve()}")
 
-    playlist = load_playlist(
-        playlist_path=playlist_path,
-        media_base_dir=media_dir,
-        now=now,
-    )
+    playlist = snapshot["playlist"]
 
-    active_gate = ActiveTimeGate(playlist.get("active_time", {}))
+    active_gate = ActiveTimeGate(runtime)
 
     lanes = playlist["lanes"]
     auto_policy = playlist.get("auto_policy", {})
@@ -186,7 +187,9 @@ def main():
                     meta.get("default_start_offset_sec", 0),
                 ),
             ),
+            items_provider=lambda lane_id=lane_id: runtime.get_lane_items(lane_id),
             active_checker=active_gate.is_active,
+            items_refresh_interval_sec=30,
             inactive_sleep_sec=30,
         )
 

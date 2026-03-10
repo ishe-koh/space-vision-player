@@ -40,11 +40,20 @@ def _is_item_available(item: Dict[str, Any], now: datetime) -> bool:
     return True
 
 
-def _filter_items(items: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
+def _filter_items(items: List[Any], now: datetime) -> List[Any]:
     """
     items リストから、再生可能なものだけを抽出する。
+
+    文字列 path は常に残し、dict item のみ availability を評価する。
     """
-    return [item for item in items if _is_item_available(item, now)]
+    filtered: List[Any] = []
+    for item in items:
+        if isinstance(item, dict):
+            if _is_item_available(item, now):
+                filtered.append(item)
+            continue
+        filtered.append(item)
+    return filtered
 
 
 def _resolve_media_path(path: str, media_base_dir: Path) -> Path:
@@ -186,7 +195,7 @@ def load_playlist(
         if items is None:
             items = []
         else:
-            if now is not None and items and isinstance(items[0], dict):
+            if now is not None:
                 items = _filter_items(items, now)
 
         # lane 設定は保ったまま、items だけ差し替える

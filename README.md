@@ -8,6 +8,7 @@ media-server（別リポジトリ）が出力した
 - 曜日別のプレイリストを選択して再生
 - lane（領域）ごとに mpv を起動して同時再生
 - 同期中は updating 動画へ自動切替
+- `is_available_*` は実行中も定期再評価される
 
 ## Requirements
 - OS: Raspberry Pi OS (Lite 64-bit 推奨) または Desktop
