@@ -16,6 +16,7 @@
   // ========================================
   // active_time（省略可）
   // 省略時は常時再生
+  // mon〜sun の曜日キーだけが参照される。always キーは使わない。
   // ========================================
   // "active_time": {
   //   "mon": {"from": "08:00", "until": "22:00"},
@@ -128,7 +129,8 @@
   // auto_policy
   // ========================================
   // "auto_policy": {
-  //   // output/media/<weekday>/lane0 を基準にするならこう
+  //   // output/media/ からの相対パス。prefix に output/media は付けない。
+  //   // media-server が lane 別に出力したものを読むならこう
   //   "directory": "always/lane0",
   //
   //   // ソート順（asc / desc）
@@ -139,7 +141,8 @@
   //   // - append_remaining: items の末尾に未掲載ファイルを追加
   //   // - append_remaining_always: append_remaining に加えて always_directory も追加
   //   // - disabled: auto_policy を使わない
-  //   // always_directory: append_remaining_always の always 参照先（省略時は output/media/always）
+  //   // always_directory: append_remaining_always の always 参照先
+  //   // 省略時は "always" 直下
   //   // "always_directory": "always/lane0",
   //   "mode": "append_remaining"
   // }

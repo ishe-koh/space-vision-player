@@ -1,6 +1,6 @@
 {
   "auto_policy": {
-    "directory": "output/media/always",
+    "directory": "always",
     "sort": "asc",
     "loop": true,
     "mode": "replace_if_empty",

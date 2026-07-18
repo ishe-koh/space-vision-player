@@ -54,6 +54,7 @@ Rules:
 - `from` / `until` are **HH:MM** (24h)
 - Playback is active when `from <= now < until`
 - If the weekday key is missing, playback is always on
+- Only `mon` through `sun` are checked. `active_time.always` is ignored.
 
 ## lanes
 - Lane order follows JSON declaration order.
@@ -108,11 +109,13 @@ Used to auto-generate items from a directory (media outputs).
 Rules:
 - `directory` is resolved relative to `output/media/` (vision root)
   - To target lane0: `"<weekday>/lane0"`
+- Do not include the `output/media/` prefix in `directory`
+- `auto_policy` can be top-level or lane-level. Lane-level overrides top-level.
 - `mode`:
   - `replace_if_empty`: if lane items are empty after availability filtering, use auto items
   - `append_remaining`: append files not already listed in items
-- `append_remaining_always`: append files not already listed, plus `always_directory`
   - `disabled`: do not use auto items
+  - `append_remaining_always`: append files not already listed, plus `always_directory`
 - `mode` default is `replace_if_empty`
 - `always_directory` (optional): override always media directory for append_remaining_always
   - To target lane0: `"always/lane0"`

@@ -37,14 +37,14 @@ space-vision-player/
 
 本番運用では LightDM やデスクトップの自動ログインを使わない。
 `xorg-kiosk` が専用 Xorg を起動し、`space-vision-player` がその上で mpv を起動する。
-以下は OS ユーザー名を `entas`、配置先を
-`/home/entas/space-vision-player` とした手順。異なるユーザー名を使う場合は、
+以下は OS ユーザー名を `pi`、配置先を
+`/home/pi/space-vision-player` とした手順。異なるユーザー名を使う場合は、
 ユーザー名とホームディレクトリを読み替える。
 
 ### 1. OS 書き込みと初期設定
 
 - Raspberry Pi OS Lite 64-bit 推奨
-- Raspberry Pi Imager でユーザー `entas`、Wi-Fi、SSH、hostname を設定
+- Raspberry Pi Imager でユーザー `pi`、Wi-Fi、SSH、hostname を設定
 - media-server と同じネットワークへ接続
 
 ### 2. 必要パッケージの導入
@@ -57,17 +57,17 @@ sudo apt-get install -y git python3 mpv rsync xserver-xorg
 ### 3. リポジトリ配置
 
 ```sh
-cd /home/entas
+cd /home/pi
 git clone <REPOSITORY_URL> space-vision-player
-cd /home/entas/space-vision-player
+cd /home/pi/space-vision-player
 ```
 
 すでに clone 済みの場合は、次で配置と所有者を確認する。
 
 ```sh
 pwd
-test "$(pwd)" = /home/entas/space-vision-player
-test "$(stat -c %U .)" = entas
+test "$(pwd)" = /home/pi/space-vision-player
+test "$(stat -c %U .)" = pi
 ```
 
 ### 4. systemd service の配置
@@ -78,22 +78,19 @@ sudo cp systemd/space-vision-player.service /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
-`space-vision-player.service` は `entas` と
-`/home/entas/space-vision-player` を初期値にしている。
-別の OS ユーザーや配置先を使う場合のみ override を作成する。
+`space-vision-player.service` は `pi` と
+`/home/pi/space-vision-player` を初期値にしている。
+通常は `VISION_ID` だけを override する。
 
 ```sh
 sudo systemctl edit space-vision-player
 ```
 
-例として、開いたエディターに次を入力する。
+開いたエディターに次を入力する。
 `VISION_ID` は実機の hostname/media-server 側の vision ID に合わせる。
 
 ```ini
 [Service]
-User=entas
-Group=entas
-WorkingDirectory=/home/entas/space-vision-player
 Environment=VISION_ID=akiba_01
 ```
 
@@ -105,6 +102,8 @@ systemctl cat space-vision-player
 ```
 
 `VISION_ID` を指定せず `_local` で確認する場合は、override の作成自体を省略できる。
+`pi` 以外の OS ユーザーや配置先を使う場合だけ、`User` / `Group` /
+`WorkingDirectory` / `XAUTHORITY` を合わせて override する。
 
 ### 5. kiosk 自動起動の有効化
 
@@ -115,7 +114,8 @@ LightDM と tty1 の login console は専用 Xorg と競合するため無効化
 DPMS を無効化するため、`.xsessionrc` の作成は不要。
 
 ```sh
-sudo systemctl disable lightdm getty@tty1
+sudo systemctl disable --now lightdm 2>/dev/null || true
+sudo systemctl disable getty@tty1
 sudo systemctl enable xorg-kiosk space-vision-player
 sudo reboot
 ```
@@ -135,11 +135,21 @@ systemctl status xorg-kiosk space-vision-player --no-pager -l
 journalctl -u xorg-kiosk -u space-vision-player -b --no-pager -n 100
 ```
 
-### 7. Wi-Fi / SSH / hostname
+### 7. Wi-Fi / SSH / hostname / sudo
 
-- media-server の SSID に接続
-- media-server / 操作用 PC の SSH key を登録
+- media-server と同じネットワークへ接続
+- media-server 側の実行ユーザーの SSH 公開鍵を `pi` の `authorized_keys` に登録
 - hostname と `VISION_ID` を media-server 側の設定に合わせる
+- media-server の push は `sudo -n systemctl restart space-vision-player` を実行するため、`pi` で passwordless sudo が必要
+
+必要なら player 側で restart だけを許可する sudoers を追加する。
+
+```sh
+echo 'pi ALL=(root) NOPASSWD: /usr/bin/systemctl restart space-vision-player, /bin/systemctl restart space-vision-player' | sudo tee /etc/sudoers.d/space-vision-player-restart
+sudo chmod 440 /etc/sudoers.d/space-vision-player-restart
+sudo visudo -cf /etc/sudoers.d/space-vision-player-restart
+sudo -n systemctl restart space-vision-player
+```
 
 ### 8. RTC モジュール設定（必要な場合のみ、例: DS3231）
 
@@ -171,7 +181,7 @@ GUI/Xorg が起動済みの環境でのみ実行できる。本番運用では
 systemd kiosk を使う。
 
 ```sh
-cd /home/entas/space-vision-player
+cd /home/pi/space-vision-player
 python3 -m app.main
 ```
 
@@ -204,7 +214,8 @@ playlist に `screen` が無い場合に使用される。
 cp vision_players/_local/output/playlists/always.json \
   vision_players/_local/output/playlists/mon.json
 ```
- - `active_time` を指定すると曜日ごとの稼働時間を設定できる
+- `active_time` は `mon`〜`sun` の曜日キーだけを見る。`always` キーは使わない
+- `auto_policy.directory` と item path は `output/media/` 基準の相対パス
 
 ## Usage
 ### Manual run
@@ -231,20 +242,21 @@ player 側は以下の順で `vision_id` を解決する:
 
 server 側の環境変数:
 - `VISION_ID` (必須): 例 `akiba_01`
-- `PLAYER_HOSTNAME` (任意): 既定は `VISION_ID`
-- `PLAYER_IP` (任意): hostname 不在時のフォールバック
+- `PLAYER_HOSTNAME` (任意): `push_media.sh` の既定は `vision-player-${VISION_ID}`、`encode_and_push.sh` の既定は `${VISION_ID}`
+- `PLAYER_IP` (任意): hostname / DHCP lease 不在時の固定IP指定
 - `PLAYER_USER` (任意): 既定は `pi`
-- `REMOTE_BASE` (任意): 既定は `/home/${PLAYER_USER}/space-vision-player`
-- `MEDIA_ROOT` (任意): 既定は media-server のリポジトリルート
+- `REMOTE_PLAYER_ROOT` (任意): 既定は `/home/${PLAYER_USER}/space-vision-player`
+- `REMOTE_OUTPUT_DIR` (任意): 既定は `${REMOTE_PLAYER_ROOT}/vision_players/${VISION_ID}/output`
+- `REPO_ROOT` (任意): 既定は media-server のリポジトリルート
 - `LEASES_FILE` (任意): 既定は `/var/lib/misc/dnsmasq.leases`
 - `RSYNC_OPTS` (任意): 既定は `-az --size-only`
-- `RSYNC_DELETE=1` で削除も反映
+- `RSYNC_DELETE=1` で削除も反映（既定で有効）
 
-`entas` 構成で push するときは media-server 側で次を指定する。
+`pi` 構成なら通常は `PLAYER_USER` / `REMOTE_PLAYER_ROOT` の指定は不要。
+固定IPで push する例:
 
 ```sh
-export PLAYER_USER=entas
-export REMOTE_BASE=/home/entas/space-vision-player
+VISION_ID=akiba_01 PLAYER_IP=192.168.x.x PLAYER_USER=pi ./bin/encode_and_push.sh
 ```
 
 ※ `output/playlists/` は同期で上書きされるため、編集は media-server 側で行う。

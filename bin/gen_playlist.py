@@ -48,8 +48,8 @@ def main() -> None:
     auto_policy = {}
     if use_auto:
         directory = _prompt(
-            "auto_policy.directory (ex: output/media/always)",
-            f"output/media/{weekday}",
+            "auto_policy.directory (relative to output/media, ex: always)",
+            weekday,
         )
         sort = _prompt("auto_policy.sort (asc/desc)", "asc")
         mode = _prompt(
