@@ -6,12 +6,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/space-vision-player
+User=entas
+Group=entas
+WorkingDirectory=/home/entas/space-vision-player
 Environment=PYTHONUNBUFFERED=1
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=XAUTHORITY=/home/entas/.Xauthority
 Environment=SVP_MPV_VO=gpu
 Environment=SVP_MPV_GPU_CONTEXT=x11egl
 ExecStart=/usr/bin/python3 -m app.main

@@ -1,4 +1,4 @@
-ぃ# space-vision-player
+# space-vision-player
 
 Raspberry Pi 向けの LED ビジョン再生プレイヤー。
 media-server（別リポジトリ）が出力した
@@ -33,77 +33,147 @@ space-vision-player/
 
 `vision_players/` は実行時に同期されるため git 管理外。
 
-## Raspberry Pi 4 setup (recommended)
-1) OS 書き込み + 初期設定
-- Raspberry Pi OS Lite 64-bit 推奨（Desktop でも可）
-- Lite の場合は後述の X 環境を入れる
-- Raspberry Pi Imager で Wi‑Fi / SSH / hostname を事前設定すると楽
+## Raspberry Pi 4 setup (recommended: systemd kiosk)
 
-2) パッケージ導入
-```
+本番運用では LightDM やデスクトップの自動ログインを使わない。
+`xorg-kiosk` が専用 Xorg を起動し、`space-vision-player` がその上で mpv を起動する。
+以下は OS ユーザー名を `entas`、配置先を
+`/home/entas/space-vision-player` とした手順。異なるユーザー名を使う場合は、
+ユーザー名とホームディレクトリを読み替える。
+
+### 1. OS 書き込みと初期設定
+
+- Raspberry Pi OS Lite 64-bit 推奨
+- Raspberry Pi Imager でユーザー `entas`、Wi-Fi、SSH、hostname を設定
+- media-server と同じネットワークへ接続
+
+### 2. 必要パッケージの導入
+
+```sh
 sudo apt-get update
-sudo apt-get install -y \
-  git \
-  python3 \
-  mpv \
-  rsync \
-  xserver-xorg \
-  xinit \
-  openbox \
-  lightdm \
-  unclutter
+sudo apt-get install -y git python3 mpv rsync xserver-xorg
 ```
 
-3) RTC モジュール設定（例: DS3231）
+### 3. リポジトリ配置
+
+```sh
+cd /home/entas
+git clone <REPOSITORY_URL> space-vision-player
+cd /home/entas/space-vision-player
+```
+
+すでに clone 済みの場合は、次で配置と所有者を確認する。
+
+```sh
+pwd
+test "$(pwd)" = /home/entas/space-vision-player
+test "$(stat -c %U .)" = entas
+```
+
+### 4. systemd service の配置
+
+```sh
+sudo cp systemd/xorg-kiosk.service /etc/systemd/system/
+sudo cp systemd/space-vision-player.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+`space-vision-player.service` は `entas` と
+`/home/entas/space-vision-player` を初期値にしている。
+別の OS ユーザーや配置先を使う場合のみ override を作成する。
+
+```sh
+sudo systemctl edit space-vision-player
+```
+
+例として、開いたエディターに次を入力する。
+`VISION_ID` は実機の hostname/media-server 側の vision ID に合わせる。
+
+```ini
+[Service]
+User=entas
+Group=entas
+WorkingDirectory=/home/entas/space-vision-player
+Environment=VISION_ID=akiba_01
+```
+
+保存後、override が反映されたことを確認する。
+
+```sh
+sudo systemctl daemon-reload
+systemctl cat space-vision-player
+```
+
+`VISION_ID` を指定せず `_local` で確認する場合は、override の作成自体を省略できる。
+
+### 5. kiosk 自動起動の有効化
+
+LightDM と tty1 の login console は専用 Xorg と競合するため無効化する。
+この手順では、作業中のコンソールを切り替えないよう `--now` を付けず、
+再起動後に service を開始する。
+`xorg-kiosk.service` は `-s 0 -dpms` で Xorg のスクリーンセーバーと
+DPMS を無効化するため、`.xsessionrc` の作成は不要。
+
+```sh
+sudo systemctl disable lightdm getty@tty1
+sudo systemctl enable xorg-kiosk space-vision-player
+sudo reboot
+```
+
+### 6. 再起動後の確認
+
+SSH で接続し、2つの service が `active` であることを確認する。
+
+```sh
+systemctl is-active xorg-kiosk space-vision-player
+```
+
+起動できない場合は次のログを確認する。
+
+```sh
+systemctl status xorg-kiosk space-vision-player --no-pager -l
+journalctl -u xorg-kiosk -u space-vision-player -b --no-pager -n 100
+```
+
+### 7. Wi-Fi / SSH / hostname
+
+- media-server の SSID に接続
+- media-server / 操作用 PC の SSH key を登録
+- hostname と `VISION_ID` を media-server 側の設定に合わせる
+
+### 8. RTC モジュール設定（必要な場合のみ、例: DS3231）
+
 - 5V / GND を GPIO に接続
 - I2C 有効化:
-```
+```sh
 sudo raspi-config
 ```
 Interfacing Options → I2C → Enable
 - `/boot/config.txt` に overlay を追加:
-```
+```ini
 dtoverlay=i2c-rtc,ds3231
 ```
 - fake-hwclock を無効化:
-```
+```sh
 sudo apt-get remove -y fake-hwclock
 sudo systemctl disable fake-hwclock
 ```
 - タイムゾーン設定 + RTC へ書き込み:
-```
+```sh
 sudo timedatectl set-timezone Asia/Tokyo
 sudo hwclock -w
 ```
 ※ RTC が別型番の場合は overlay 名を変更する。
 
-4) 自動ログイン + X 起動
-- `sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin
-- もしくは `/etc/lightdm/lightdm.conf`
-```
-[Seat:*]
-autologin-user=pi
-autologin-session=openbox
-```
+### Manual run (service 化前の短時間テスト用)
 
-5) 画面スリープ無効化
-```
-cat <<'EOS' > /home/pi/.xsessionrc
-xset s off
-xset -dpms
-xset s noblank
-unclutter -idle 0.5 -root &
-EOS
-```
+GUI/Xorg が起動済みの環境でのみ実行できる。本番運用では
+systemd kiosk を使う。
 
-6) Wi‑Fi / SSH
-- media-server の SSID に接続
-- media-server / 操作用 PC の SSH key を登録
-
-7) 機器名（hostname）を決める
-- 例: `akiba_01`
-- Raspberry Pi Imager か `raspi-config` で設定
-- media-server 側に `media/<hostname>/source/` を作成
+```sh
+cd /home/entas/space-vision-player
+python3 -m app.main
+```
 
 ### Optional: handy commands on the device
 ```
@@ -170,6 +240,13 @@ server 側の環境変数:
 - `RSYNC_OPTS` (任意): 既定は `-az --size-only`
 - `RSYNC_DELETE=1` で削除も反映
 
+`entas` 構成で push するときは media-server 側で次を指定する。
+
+```sh
+export PLAYER_USER=entas
+export REMOTE_BASE=/home/entas/space-vision-player
+```
+
 ※ `output/playlists/` は同期で上書きされるため、編集は media-server 側で行う。
 
 ### Standalone usage (no media-server)
@@ -197,62 +274,22 @@ touch state/media_updating.flag   # updating 表示
 rm -f state/media_updating.flag   # 通常再生へ戻す
 ```
 
-## Deploy (systemd)
-1) リポジトリ配置
-```
-sudo mkdir -p /home/pi/space-vision-player
-sudo chown -R pi:pi /home/pi/space-vision-player
-```
+## Service management
 
-2) service 配置（player + Xorg 専用）
-```
-sudo cp systemd/space-vision-player.service /etc/systemd/system/
-sudo cp systemd/xorg-kiosk.service /etc/systemd/system/
-```
+```sh
+# 状態確認
+systemctl status xorg-kiosk space-vision-player --no-pager
 
-3) kiosk 構成へ切替（VT switch 回避のため必須）
-```
-sudo systemctl disable --now lightdm getty@tty1
-sudo systemctl daemon-reload
-sudo systemctl enable --now xorg-kiosk
-```
-`xorg-kiosk.service` は `Xorg :0 -nolisten tcp -noreset -keeptty -novtswitch vt1` で起動し、
-VT switch の影響を減らす目的。
+# ログ追跡
+journalctl -u xorg-kiosk -u space-vision-player -f
 
-4) `space-vision-player` の override を作成
-```
-sudo systemctl edit space-vision-player
-```
-例:
-```
-[Service]
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/space-vision-player
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi/.Xauthority
-Environment=VISION_ID=akiba_01
-```
-環境に合わせて `User` とパスを変更すること。
-
-5) `systemd/space-vision-player.service` の前提
-- `VISION_ID` で再生するディレクトリを指定（例: `akiba_01`）
-  - 未指定の場合は `vision_players/_local/` が優先される
-  - 複数の `vision_players/` がある場合は必ず指定する
-- 必要に応じて `DISPLAY` / `XAUTHORITY` を環境に合わせる
-- `SVP_MPV_GPU_CONTEXT=x11egl` は既定値（DRM 直接利用を避けるため）
-
-6) 有効化
-```
-sudo systemctl enable --now space-vision-player
+# Player だけ再起動
 sudo systemctl restart space-vision-player
 ```
 
-7) ログ確認
-```
-journalctl -u space-vision-player -f
-journalctl -u xorg-kiosk -f
-```
+`VISION_ID` 未指定時は `vision_players/_local/` が使われる。
+`vision_players/` に複数の実機ディレクトリがある環境では、
+service override で `VISION_ID` を必ず指定する。
 
 ## Stability tips (Raspberry Pi + Xorg + mpv)
 - まず `SVP_MPV_GPU_CONTEXT=x11egl`（既定）で運用し、`mpv -> Xorg -> DRM` に固定する。
