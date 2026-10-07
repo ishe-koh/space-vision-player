@@ -137,6 +137,14 @@ class LanePlayer:
                 if proc.poll() is not None:
                     break
                 self._refresh_items()
+                if item.path not in {available.path for available in self.cfg.items}:
+                    # A deadline may pass while a single item is looping in mpv.
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    break
                 if active_checker and not active_checker():
                     proc.terminate()
                     try:
