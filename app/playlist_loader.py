@@ -70,6 +70,8 @@ def _build_auto_items(
     auto_policy: Dict[str, Any],
     media_base_dir: Path,
 ) -> List[LaneItem]:
+    if "items" in auto_policy:
+        return _normalize_items(auto_policy["items"], media_base_dir)
     directory = auto_policy.get("directory")
     if not directory:
         return []
@@ -173,6 +175,15 @@ def load_playlist(
     with playlist_path.open("r", encoding="utf-8") as f:
         playlist = json.load(f)
 
+    availability = None
+    if "media_availability" in playlist:
+        manifest_path = playlist_path.parent / playlist["media_availability"]
+        with manifest_path.open(encoding="utf-8") as f:
+            manifest = json.load(f)
+        if manifest.get("version") != 1 or not isinstance(manifest.get("items"), dict):
+            raise ValueError("invalid media availability manifest")
+        availability = manifest["items"]
+
     lanes = playlist.get("lanes", {})
     default_auto_policy = playlist.get("auto_policy", {})
     filtered_lanes: Dict[str, Any] = {}
@@ -209,6 +220,20 @@ def load_playlist(
             always_items=always_items,
         )
 
+        if availability is not None:
+            allowed = []
+            for item in filtered_lane_conf["items"]:
+                try:
+                    key = item.path.resolve().relative_to(media_base_dir.resolve()).as_posix()
+                except ValueError:
+                    continue
+                rule = availability.get(key)
+                # Missing metadata never grants permission to a newly generated asset.
+                if rule is None or rule.get("enabled") is False:
+                    continue
+                if now is None or _is_item_available(rule, now):
+                    allowed.append(item)
+            filtered_lane_conf["items"] = allowed
         filtered_lanes[lane_id] = filtered_lane_conf
 
     playlist["lanes"] = filtered_lanes
