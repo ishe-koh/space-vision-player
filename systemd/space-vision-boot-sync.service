@@ -1,0 +1,19 @@
+[Unit]
+Description=Fetch published media once at boot before VisionPlayer
+Wants=network-online.target
+After=network-online.target
+Before=space-vision-player.service
+
+[Service]
+Type=oneshot
+User=ishii
+Group=ishii
+WorkingDirectory=/home/ishii/space-vision-player
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/space-vision-boot-sync.env
+ExecStart=/usr/bin/python3 -m app.boot_sync
+RemainAfterExit=yes
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target
